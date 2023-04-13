@@ -1,0 +1,259 @@
+import re
+
+tokens = [
+    (r'\+', 'Add'),
+    (r'-', 'Sub'),
+    (r'\*', 'Mul'),
+    (r'/', 'Div'),
+    (r'%', 'Mod'),
+    (r'\(', 'LPar'),
+    (r'\)', 'RPar'),
+    (r'\{', 'LBrace'),
+    (r'\}', 'RBrace'),
+    (r'=', 'Assign'),
+    (r'==', 'Equal'),
+    (r'<', 'Less'),
+    (r'<=', 'LessEqual'),
+    (r'!=', 'NotEqual'),
+    (r'>', 'Great'),
+    (r'>=', 'GreatEqual'),
+    (r'&&', 'And'),
+    (r'\|\|', 'Or'),
+    (r'[a-zA-Z_][a-zA-Z0-9_]*', 'Variable'),
+    (r'\d+\.\d+', 'Float'),
+    (r'\d+', 'Int'),
+    (r';', 'Semicolon'),
+    (r'if', 'If'),
+    (r'while', 'While'),
+    (r'else', 'Else'),
+]
+
+tokens = [(re.compile(p[0]), p[1]) for p in tokens]
+
+
+class Parser:
+    def __init__(self, tokens):
+        self.tokens = tokens
+        self.pos = 0
+
+    def parse(self):
+        return self.stmt_list()
+
+    def match(self, *tokens):
+        if self.pos < len(self.tokens):
+            self.pos += 1
+            return True
+        else:
+            return False
+
+    def stmt(self):
+        if_stmt = self.if_stmt()
+        if if_stmt:
+            return if_stmt
+
+        block = self.block()
+        if block:
+            return block
+
+        expr = self.expr()
+        if expr:
+            return expr
+
+        while_loop = self.while_loop()
+        if while_loop:
+            return while_loop
+
+        return False
+
+    def stmt_list(self):
+        stmt_list = []
+        while self.stmt():
+            if not self.match('Semicolon'):
+                return False
+            stmt_list.append(stmt)
+        return True
+
+    def while_loop(self):
+        if not self.match('While'):
+            return False
+
+        if not self.match('LPar'):
+            return False
+
+        bool_expr = self.bool_expr()
+        if not bool_expr:
+            return False
+
+        if not self.match('RPar'):
+            return False
+
+        stmt = self.stmt()
+        if not stmt:
+            return False
+
+        if self.match('Semicolon'):
+            return True
+
+        block = self.block()
+        if block:
+            return block
+
+        return False
+
+    def if_stmt(self):
+        if not self.match('If'):
+            return False
+
+        if not self.match('LPar'):
+            return False
+
+        bool_expr = self.bool_expr()
+        if not bool_expr:
+            return False
+
+        if not self.match('RPar'):
+            return False
+
+        stmt1 = self.stmt()
+        if not stmt1:
+            return False
+
+        if self.match('Semicolon'):
+            return True
+
+        block1 = self.block()
+        if not block1:
+            return False
+
+        if self.match('Else'):
+            stmt2 = self.stmt()
+            if not stmt2:
+                return False
+
+            if self.match('Semicolon'):
+                return True
+
+            block2 = self.block()
+            if not block2:
+                return False
+
+            return True
+
+        return False
+
+    def block(self):
+        if not self.match('LBrace'):
+            return False
+
+        if not self.stmt_list():
+            return False
+
+        if not self.match('RBrace'):
+            return False
+
+        return True
+
+    def expr(self):
+        term = self.term()
+        if not term:
+            return False
+
+        while self.match('Add') or self.match('Sub'):
+            if not self.term():
+                return False
+
+        return True
+
+    def term(self):
+        fact = self.fact()
+        if not fact:
+            return False
+
+        while self.match('Mul') or self.match('Div') or self.match('Mod'):
+            if not self.fact():
+                return False
+
+        return True
+
+    def fact(self):
+        if self.match('Variable') or self.match('Int') or self.match('Float'):
+            return True
+
+        if self.match('LPar'):
+            if not self.expr():
+                return False
+
+            if not self.match('RPar'):
+                return False
+
+            return True
+
+        return False
+
+    def bool_expr(self):
+        bterm = self.bterm()
+        if not bterm:
+            return False
+
+        while self.match('Less') or self.match('LessEqual') or self.match('Great') or self.match('GreatEqual'):
+            if not self.bterm():
+                return False
+
+        return True
+    
+    def bterm(self):
+        band = self.band()
+        if not band:
+            return False
+
+        while self.match('EQ') or self.match('NE'):
+            if not self.band():
+                return False
+
+        return True
+
+    def band(self):
+        bor = self.bor()
+        if not bor:
+            return False
+
+        while self.match('AND'):
+            if not self.bor():
+                return False
+
+        return True
+
+    def bor(self):
+        expr = self.expr()
+        if not expr:
+            return False
+
+        while self.match('OR'):
+            if not self.expr():
+                return False
+
+        return True
+
+def tokenize(code):
+    listoftokens = []
+    i = 0
+    while i < len(code):
+        match = None
+        for pattern, token_type in tokens:
+            match = pattern.match(code, i)
+            if match:
+                value = match.group(0)
+                if token_type:
+                    listoftokens.append((token_type, value))
+                break
+        if not match:
+            raise SyntaxError(f"Invalid token: {code[i]}")
+        else:
+            i = match.end()
+    return listoftokens
+
+Wheat = 'x-5/(a-12.9){}}' #placeholder
+Corn = tokenize(Wheat)
+parser = Parser(Corn)
+result = parser.stmt()
+print(result)
